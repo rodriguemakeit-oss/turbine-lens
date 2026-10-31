@@ -1,0 +1,66 @@
+.databricks/
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.DS_Store
+_agent_workdir/
+
+# drawio autosave backups
+*.bkp
+
+# Node / Client
+client/node_modules/
+
+# IDE
+.vscode/
+.idea/
+
+# Environment
+.env
+.env.local
+
+# Compiled in the container at boot (app.yml); a build by-product, never committed.
+client/out/
+
+# ------------------------------------------------------------------
+# Outillage d'analyse — SonarQube
+# ------------------------------------------------------------------
+# Répertoire de travail du scanner et scanner téléchargé : régénérés à chaque
+# analyse, et déjà listés en `sonar.exclusions`. Les ignorer évite qu'une analyse
+# rende `git status` illisible juste avant un commit.
+.scannerwork/
+.scanner/
+
+# ------------------------------------------------------------------
+# uv
+# ------------------------------------------------------------------
+# `pyproject.toml` ne porte QUE la configuration ruff — pas de section [project],
+# pas de dépendances. Le `uv.lock` que `uv run` dépose ici ne verrouille donc rien
+# (0 paquet) : c'est un résidu d'outillage, pas un lockfile de projet. À ré-inclure
+# le jour où pyproject.toml déclarera de vraies dépendances.
+uv.lock
+
+# ------------------------------------------------------------------
+# Bacs à sable locaux (2026-07) — jamais commités, hors périmètre de l'app
+# ------------------------------------------------------------------
+# Prototypes antérieurs conservés en local : la tentative htmx, ses prompts
+# d'agents, et le banc d'essai des sous-agents. Déjà exclus de Sonar ; ignorés ici
+# pour la même raison. Ce n'est pas une suppression — les fichiers restent sur le
+# disque, seul git cesse de les signaler.
+htmx_app/
+htmx_app_agents_tmp/
+test_sous_agent/
+
+# Local configuration and generated files
+.env
+.env.*
+!.env.example
+!.env.sample
+__pycache__/
+*.pyc
+.venv/
+node_modules/
+_scratch/
+*.log

@@ -1,0 +1,67 @@
+
+resources:
+  jobs:
+    telemetry_windstops:
+      name: "turbine_lens-telemetry-windstops"
+      description: >-
+        Run the wind_stops notebook to ingest the latest wind stop, join with the theoretical active power data,
+         and write the results to the telemetry.wind_stops table.
+         All the data are compute using the CDC of the telemetry tables
+
+      # Stamps project=turbine_lens on this job's serverless DBUs. `budget_policy_id` and
+      # NOT `usage_policy_id`, matching postgres_sync.job.yml for the reason measured
+      # there: the jobs API returns both as aliases and the bundle differ only converges
+      # on this one, so declaring the newer name leaves a permanent no-op `1 to change`
+      # on every plan — which would mask a real drift later.
+      budget_policy_id: ${var.usage_policy_id}
+
+      # Event-based, not time-based: the run follows the upload. There is no cron here
+      # on purpose — the export cadence is whoever drops the file, so a clock schedule
+      # would either lag the export or reload the previous one.
+      trigger:
+        pause_status: UNPAUSED
+        table_update:
+          table_names:
+            - turbine_lens_telemetry_data.stoplogbook.mismatch_wind_10min
+            - turbine_lens_telemetry_data.theoretical_active_power.wind_10min
+          condition: ANY_UPDATED
+
+      # The notebook overwrites the whole table, so two overlapping runs would race to
+      # replace it. Serialise them — and see `queue` below, which is what stops that
+      # serialisation from silently dropping an export.
+      max_concurrent_runs: 1
+
+      # Load-bearing with an event trigger. Without a queue, a trigger that fires while
+      # a run is active is DISCARDED — so a file landing during the previous file's run
+      # would never be ingested, and nothing would report it: no failure, no mail, just
+      # a table quietly one export behind until the next upload happened to arrive.
+      # Queued instead, the second run starts when the first finishes and picks up the
+      # newest file.
+      queue:
+        enabled: false
+
+      # NO email_notifications, deliberately. The notebook is loud by design — a date
+      # that does not parse, or a header that no longer matches the export, raises rather
+      # than loading a wrong table — but with no notification that noise goes nowhere.
+      # An export whose shape changed upstream now fails silently and the table simply
+      # stays at the previous file. Restore this, pointed at a distribution list, when
+      # someone depends on the Lorinlog data being current.
+
+      tasks:
+        - task_key: telemetry_windstops
+          notebook_task:
+            notebook_path: ../jobs/telemetry_wind_stops.py
+            base_parameters:
+              # Blank = the newest export. Set it on a one-off run ("Run now with
+              # different parameters") to re-ingest a specific file by name.
+              env: ${bundle.target}
+              target_catalog: ${var.ingest_catalog}
+              target_schema: ${resources.schemas.telemetry.name}          
+          # Safe to retry: the run is a full read plus an overwrite, so a second attempt
+          # replaces whatever the first left behind rather than adding to it.
+          max_retries: 1
+          min_retry_interval_millis: 300000
+          # Measured ~75s end to end for 363 rows. The timeout is a circuit breaker for
+          # a hung volume read, not an expected duration.
+          timeout_seconds: 1800
+

@@ -1,0 +1,240 @@
+resources:
+  apps:
+    turbine_lens_mvp:
+      name: ${var.app_name}
+      description: "Turbine Lens MVP — read-only fleet analyst on the claude-agent-sdk loop (Genie tools + read-data cross-check)."
+      source_code_path: ..
+      # Bumped MEDIUM → LARGE for headroom under concurrent turns (each turn spawns
+      # a Claude CLI subprocess).
+      compute_size: ${var.app_compute_size}
+      # Serverless usage policy — this is what stamps project=turbine_lens on the app's
+      # serverless usage in system.billing.usage, so it is the mechanism cost
+      # attribution depends on. It was previously an *inherited* default
+      # (f05df8c0-…, which stamps project=analyst), meaning the app was booked to a
+      # different project than its own Lakebase instance and the larger half of
+      # Turbine Lens's spend carried the wrong label. Declared explicitly so it also
+      # cannot drift without a code change.
+      usage_policy_id: ${var.usage_policy_id}
+
+      # -----------------------------------------------------------------------
+      # Runtime configuration.
+      #
+      # This block used to be a root-level `app.yml`. It moved here because a
+      # synced file cannot see bundle variables — `${var.x}` inside app.yml is
+      # just text — and every value below differs between environments. The
+      # whole runtime lives in one place now: `config` carries exactly
+      # `command` and `env`, so there is no partial override to reason about
+      # and no second description of how the app starts.
+      #
+      # THE FRONTEND IS COMPILED IN THE CONTAINER ON EVERY BOOT, AND
+      # DELIBERATELY NEVER SKIPS. client/out/ is a build by-product: not
+      # committed, not shipped. Skipping the build is only correct once
+      # something guarantees the artifact matches client/src/ — a pipeline
+      # building from a known commit — and nothing does yet, so a bundle found
+      # on disk is of unknown provenance and is not trusted.
+      #
+      # An earlier `if [ ! -d client/out ]` guard read as a cheap fast path but
+      # was in fact unreachable: an app deployment re-extracts the source tree,
+      # so the bundle is always gone. Its danger was latent rather than absent —
+      # the first thing to place a bundle in the source tree would have switched
+      # it on, and it would then serve a STALE UI from a deploy that reported
+      # success, with no error and no log line.
+      #
+      # Two properties to preserve:
+      #   * the build FAILS SOFT to any bundle already on disk, because boot
+      #     depends on egress to nodejs.org and the npm registry, and `set -e`
+      #     would otherwise take the whole app down when only the UI is
+      #     affected;
+      #   * it uses `npm ci`, NOT `npm install`, so the lockfile is
+      #     authoritative and dependency drift fails loudly instead of quietly
+      #     compiling different bytes on two boots.
+      # -----------------------------------------------------------------------
+      config:
+        command:
+          - bash
+          - -c
+          - |
+            # NOTE: no braced shell variables in this script, and none in these comments
+            # either — a `|` block scalar has no comments, every line is string content.
+            # DABs resolves dollar-brace as a bundle reference before the string reaches
+            # bash, and one fails the plan with `invalid dependency ... no such node`.
+            # Plain `$NAME` is safe: `-`, `/` and `:` all terminate a shell variable name,
+            # so the braces were never doing anything here.
+            set -e
+            set -o pipefail
+            NODE_VERSION=20.18.1
+            NODE_BIN="/tmp/node-v$NODE_VERSION-linux-x64/bin"
+
+            # The body is a subshell so its `cd` cannot leak into the uvicorn exec below,
+            # and the steps are chained with && rather than relying on errexit, which bash
+            # suspends inside an `if` condition.
+            build_frontend() (
+              curl -fsSL "https://nodejs.org/dist/v$NODE_VERSION/node-v$NODE_VERSION-linux-x64.tar.gz" \
+                | tar -xz -C /tmp \
+                && export PATH="$NODE_BIN:$PATH" \
+                && echo "Node $(node --version), npm $(npm --version)" \
+                && cd client \
+                && npm ci \
+                && npm run build
+            )
+
+            echo "compiling frontend from client/src…"
+            if build_frontend; then
+              # Vite hashes the entry filename, so this line fingerprints what is being
+              # served — compare it with the served bundle to prove what is actually live.
+              echo "frontend bundle: $(ls client/out/assets/index-*.js 2>/dev/null | head -1)"
+            elif [ -n "$(ls -A client/out 2>/dev/null)" ]; then
+              # Most likely cause: no egress to nodejs.org or the npm registry. Serve a
+              # stale UI rather than taking the whole app down with it.
+              echo "frontend build FAILED — serving the bundle already on disk"
+            else
+              echo "frontend build FAILED and no bundle on disk — cannot serve the UI"
+              exit 1
+            fi
+            exec python -m uvicorn server.app:app --host 0.0.0.0 --port $DATABRICKS_APP_PORT
+
+        env:
+          - name: TURBINE_LENS_PHASE0
+            value: "false"          
+          - name: CLAUDE_CODE_STREAM_CLOSE_TIMEOUT
+            value: "3600000"
+
+          # Read surface. The catalog is a variable because it is a Delta Sharing
+          # catalog reachable only from workspaces it is bound to, so its name can
+          # differ per environment; server/config.py builds ALLOWED_TABLES from it.
+          - name: TURBINE_LENS_WAREHOUSE_ID
+            value: ${var.warehouse_id}
+          - name: TURBINE_LENS_READ_CATALOG
+            value: ${var.read_catalog}
+          # Split out of read_catalog only until the validated-loss CDC table
+          # lands in the turbine_lens catalog; see the variable's description.
+          - name: TURBINE_LENS_LOSS_CATALOG
+            value: ${var.loss_catalog}
+          - name: TURBINE_LENS_INGEST_CATALOG
+            value: ${var.ingest_catalog}
+
+          # Genie space ids, taken straight from the bundle-managed spaces. server/config.py
+          # still carries the noprod ids as defaults so an unset variable degrades to dev
+          # rather than to nothing — but those ids are workspace-scoped, so in any other
+          # workspace they resolve to a space that does not exist and the agent's whole
+          # qualitative surface goes quiet WITHOUT erroring. These references are what stop
+          # that.
+          #
+          # Through VARIABLES, not `${resources.genie_spaces...}` directly. The spaces are
+          # declared on the prod target only, so a direct reference makes the DEV target
+          # unresolvable: `invalid dependency ... no such node`. Worse, before that error
+          # surfaced, `validate` passed and dev resolved the env to the LITERAL STRING
+          # `${resources.genie_spaces.rema.id}` — an app that starts fine and fails every
+          # Genie call. Prod points these variables at the resources, so the dependency
+          # edge and the deploy-time id both still work.
+          - name: TURBINE_LENS_GENIE_REMA
+            value: ${var.genie_rema}
+          - name: TURBINE_LENS_GENIE_REX
+            value: ${var.genie_rex}
+          - name: TURBINE_LENS_GENIE_LORIN
+            value: ${var.genie_lorin}
+          - name: TURBINE_LENS_GENIE_ANOMALY
+            value: ${var.genie_anomaly}
+          - name: TURBINE_LENS_GENIE_ALARM_STOP
+            value: ${var.genie_alarm_stop}
+          - name: TURBINE_LENS_GENIE_FLEET_REPORTING
+            value: ${var.genie_fleet_reporting}
+
+          # Lakebase (R2) — instance to mint Postgres tokens for; DB + schema names.
+          - name: TURBINE_LENS_LAKEBASE
+            value: "true"
+          - name: LAKEBASE_INSTANCE_NAME
+            value: ${var.db_instance_name}
+          - name: LAKEBASE_DATABASE_NAME
+            value: ${var.db_database_name}
+          - name: LAKEBASE_SCHEMA_NAME
+            value: ${var.lakebase_schema}
+
+          # MLflow tracing. The experiment id comes from the app-resource binding
+          # below rather than from a variable, which is what keeps it correct under
+          # dev mode's experiment-name prefixing; auth is the app's own SP.
+          - name: MLFLOW_TRACKING_URI
+            value: "databricks"
+          - name: MLFLOW_EXPERIMENT_ID
+            value_from: "mlflow-traces"
+          
+          - name: TURBINE_LENS_TRACES_CATALOG
+            value: ${var.databricks_catalog_name}
+          - name: TURBINE_LENS_TRACES_SCHEMA
+            value: ${resources.schemas.turbine_lens_traces_schema.name}
+          - name: TURBINE_LENS_OTEL_TABLE_PREFIX
+            value: ${var.otel_table_prefix}
+
+          - name: TURBINE_LENS_MLFLOW_TABLE_PREFIX
+            value: ${var.mlflow_table_prefix}
+          
+          - name: TURBINE_LENS_GATEWAY
+            value: ${resources.model_services.turbine_lens_ia_gateway.id}
+          
+          - name: model
+            value: ${var.model}
+          
+          - name: MLFLOW_TRACING_SQL_WAREHOUSE_ID    
+            value: ${var.warehouse_id}
+      # -----------------------------------------------------------------------
+      # App resource bindings.
+      #
+      # Each entry does two things at once: it grants the app's own
+      # service principal the stated permission, and it makes the value
+      # retrievable in `config.env` via `value_from`. That is why the grants
+      # belong here rather than in a runbook — an app's SP is minted by the
+      # platform and is REPLACED whenever the app is recreated, so any grant
+      # applied by hand has to be re-applied by hand, silently, or the app
+      # loses access to something it needs.
+      #
+      # Every permission is the minimum that works, and all of them are read
+      # except Lakebase (its own database) and the experiment (its own traces).
+      # The read-only posture is a security boundary, not a style choice
+      # (invariant #1).
+      # -----------------------------------------------------------------------
+      resources:
+        # Grants a Postgres role and injects PGHOST/PGUSER/...
+        - name: "lakebase"
+          database:
+            instance_name: ${var.db_instance_name}
+            database_name: ${var.db_database_name}
+            permission: "CAN_CONNECT_AND_CREATE"
+
+        # MLflow experiment for tracing + assessments — grants CAN_EDIT.
+        - name: "mlflow-traces"
+          experiment:
+            experiment_id: ${resources.experiments.turbine_lens_mvp_traces.id}
+            permission: "CAN_EDIT"
+
+        # The warehouse behind execute_sql and every Genie space. CAN_USE, not
+        # CAN_MANAGE: the app runs queries, it does not resize or stop anything.
+        - name: "warehouse"
+          sql_warehouse:
+            id: ${var.warehouse_id}
+            permission: "CAN_USE"        
+
+        # The foundation model the agent loop drives. CAN_QUERY only.
+        - name: "model"
+          serving_endpoint:
+            name: ${var.model}
+            permission: "CAN_QUERY"            
+        
+
+        # NO uc_securable bindings for the five allowlisted tables, and this is
+        # deliberate. Declaring one requires the DEPLOYING identity to hold
+        # MANAGE on that table — measured 2026-09-09:
+        #   Invalid UC Table resource table-cds-10min-wind: User must have
+        #   MANAGE privilege on UC table <catalog>.cds_data.cds_10min_wind
+        # which makes sense (granting SELECT to the app's SP means administering
+        # the table's grants) but means bundle-managed table grants cost the CI
+        # credential MANAGE on production shared data. That is a privilege
+        # escalation, not a convenience, so the app's SELECT is granted outside
+        # the bundle instead.
+        #
+        # The cost of that choice, which the runbook must carry: an app's service
+        # principal is minted by the platform and REPLACED whenever the app is
+        # recreated, so the SELECT grant has to be re-applied by hand after any
+        # recreate — silently, or the agent loses its read surface. Prefer
+        # granting the environment's Turbine Lens group and adding the app SP to it,
+        # so the privilege is attached to a durable principal rather than a
+        # disposable one.

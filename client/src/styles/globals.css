@@ -1,0 +1,147 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply font-sans text-gray-900 antialiased;
+  }
+
+  /* `color-scheme` gouverne ce que le NAVIGATEUR peint lui-même : fond des
+     contrôles natifs, ascenseurs, curseur de saisie, listes déroulantes. Sans
+     lui, il applique ses valeurs par défaut CLAIRES quels que soient les tokens
+     de la charte — mesuré : en thème sombre les champs de saisie restaient
+     blancs. Aucune classe Tailwind ne corrige ça, c'est une couche en dessous. */
+  body[data-theme="light"] { color-scheme: light; }
+  body[data-theme="dark"] { color-scheme: dark; }
+  /* "system" et l'absence d'attribut (premier rendu, avant le montage du
+     sélecteur) : on laisse l'OS trancher. */
+  body[data-theme="system"],
+  body:not([data-theme]) { color-scheme: light dark; }
+
+  /* Fond et encre des champs pris dans la charte, en base plutôt qu'écran par
+     écran : un champ dont on oublie la classe ne doit pas retomber sur le blanc
+     du navigateur. Les utilitaires Tailwind d'un composant priment (couche
+     `utilities` > `base`), donc un champ qui veut un autre fond le garde.
+     Cases à cocher, boutons radio et curseurs sont exclus : leur rendu natif
+     suit déjà `color-scheme` et un fond forcé les aplatirait. */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  textarea,
+  select {
+    @apply bg-surface text-gray-900;
+  }
+}
+
+@layer components {
+  .chat-message-markdown h1,
+  .chat-message-markdown h2,
+  .chat-message-markdown h3 {
+    @apply font-semibold mt-4 mb-2;
+  }
+  .chat-message-markdown h1 { @apply text-xl; }
+  .chat-message-markdown h2 { @apply text-lg; }
+  .chat-message-markdown h3 { @apply text-base; }
+  .chat-message-markdown p { @apply mb-2; }
+  .chat-message-markdown ul,
+  .chat-message-markdown ol { @apply ml-4 mb-2; }
+  .chat-message-markdown li { @apply mb-1; }
+  
+.chat-message-markdown code {
+    @apply px-1.5 py-0.5 rounded text-sm font-mono;
+    /* bg-gray-100 resolved to the same token as the assistant bubble bg,
+       making the code pill invisible. Core grey-200 stays one step darker. */
+    background-color: var(--ui-core-color-grey-200);
+}
+.chat-message-markdown pre {
+    @apply p-4 rounded-lg overflow-x-auto mb-3;
+    /* bg-gray-900 + text-gray-100 both resolved to grey-0 through the
+       Tailwind bridge ("inverse" semantic), producing same-color bg and
+       text in both themes. Core greys bypass the bridge and keep the
+       expected dark-bg / light-text pairing. */
+    background-color: var(--ui-core-color-grey-900);
+    color: var(--ui-core-color-grey-100);
+}
+.chat-message-markdown pre code {
+    @apply bg-transparent p-0 text-sm;
+}
+  /* `display: block` + `overflow-x: auto` : le tableau défile DANS son cadre au
+     lieu d'élargir la page. Sans ça, un tableau de réponse plus large que la
+     fenêtre déborde et le navigateur ajoute une barre de défilement horizontale
+     sur tout le document — la mise en page part alors sur la droite et la barre
+     latérale sort de l'écran. Complémentaire du `min-w-0` sur <main> : celui-ci
+     autorise le rétrécissement, celui-là donne au contenu où défiler. */
+  .chat-message-markdown table {
+    @apply w-full border-collapse mb-3 text-sm block overflow-x-auto;
+  }
+  .chat-message-markdown th,
+  .chat-message-markdown td {
+    @apply border border-gray-200 px-3 py-1.5 text-left;
+  }
+  /* Charte : nombres et identifiants en Roboto Mono. Les tableaux des réponses
+     portent l'essentiel des valeurs (MWh, ent_code, dates) ; `font-mono tabular-nums`
+     aligne les chiffres en colonne, ce que Lato ne fait pas. */
+  .chat-message-markdown td {
+    @apply font-mono tabular-nums;
+  }
+  .chat-message-markdown th {
+    @apply bg-gray-50 font-medium;
+  }
+
+    /* Genie research plans and reports use Markdown in the Thoughts panel.
+      Keep long SQL readable without widening the bubble. */
+  .thinking-markdown {
+    @apply leading-relaxed;
+    overflow-wrap: anywhere;
+  }
+  .thinking-markdown > :first-child { @apply mt-0; }
+  .thinking-markdown > :last-child { @apply mb-0; }
+  .thinking-markdown p { @apply mb-3; }
+  .thinking-markdown strong { @apply font-semibold; }
+  .thinking-markdown h4,
+  .thinking-markdown h5,
+  .thinking-markdown h6 { @apply font-semibold mt-4 mb-2; }
+  .thinking-markdown ul { @apply list-disc pl-1; }
+  .thinking-markdown ol { @apply list-decimal pl-1; }
+  .thinking-markdown li { @apply mb-2; }
+  .thinking-markdown li > p { @apply mb-1; }
+  .thinking-markdown a {
+    @apply text-turbine_lens-primary underline underline-offset-2;
+  }
+  .thinking-markdown blockquote {
+    @apply border-l-2 border-gray-300 pl-3 my-3 text-gray-600;
+  }
+  .thinking-markdown hr { @apply my-4 border-gray-300; }
+  /* Shares .chat-message-markdown for code/pre/table styling; keep it at panel size. */
+  .thinking-markdown h1,
+  .thinking-markdown h2,
+  .thinking-markdown h3 { @apply text-sm font-semibold mt-4 mb-2; }
+  .thinking-markdown code,
+  .thinking-markdown pre code,
+  .thinking-markdown table { @apply text-xs; }
+  .thinking-markdown :not(pre) > code {
+    @apply whitespace-pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  /* Blinking caret for streaming text */
+  .streaming-caret::after {
+    content: "";
+    display: inline-block;
+    width: 2px;
+    height: 1em;
+    margin-left: 1px;
+    vertical-align: text-bottom;
+    border-radius: 1px;
+    animation: caret-blink 0.8s steps(2) infinite;
+  }
+}
+
+@keyframes caret-blink {
+  /* Couleur d'action de la charte (Blue Bolt). Jamais de hex : le token suit le
+     thème clair/sombre tout seul. */
+  0%, 100% {
+    opacity: 1;
+    background-color: var(--ui-semantic-color-background-accent-blue-solid-default);
+  }
+  50% { opacity: 0; }
+}

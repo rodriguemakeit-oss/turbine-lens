@@ -1,0 +1,59 @@
+
+resources:
+  jobs:
+    telemetry_synchro:
+      name: "turbine_lens-telemetry-synchro-job"
+      description: >-
+        ingest the Telemetry data shared with delta to Fleetmind.
+        Theses tables have to be used in the Fleetmind application, so they have to be ingested in the Fleetmind catalog.
+
+      # Stamps project=turbine_lens on this job's serverless DBUs. `budget_policy_id` and
+      # NOT `usage_policy_id`, matching postgres_sync.job.yml for the reason measured
+      # there: the jobs API returns both as aliases and the bundle differ only converges
+      # on this one, so declaring the newer name leaves a permanent no-op `1 to change`
+      # on every plan — which would mask a real drift later.
+      budget_policy_id: ${var.usage_policy_id}
+
+      # Every hour, on the hour. The Telemetry export is updated daily at 00:00 UTC, so this schedule is more than frequent enough to pick up a new file within an hour of its arrival. The job      
+      schedule:
+        quartz_cron_expression: 0 0 * * * ?
+        timezone_id: UTC
+        pause_status: ${var.schedules_paused}
+
+      # The notebook overwrites the whole table, so two overlapping runs would race to
+      # replace it. Serialise them — and see `queue` below, which is what stops that
+      # serialisation from silently dropping an export.
+      max_concurrent_runs: 1
+
+      # Load-bearing with an event trigger. Without a queue, a trigger that fires while
+      # a run is active is DISCARDED — so a file landing during the previous file's run
+      # would never be ingested, and nothing would report it: no failure, no mail, just
+      # a table quietly one export behind until the next upload happened to arrive.
+      # Queued instead, the second run starts when the first finishes and picks up the
+      # newest file.
+      queue:
+        enabled: false
+
+      # NO email_notifications, deliberately. The notebook is loud by design — a date
+      # that does not parse, or a header that no longer matches the export, raises rather
+      # than loading a wrong table — but with no notification that noise goes nowhere.
+      # An export whose shape changed upstream now fails silently and the table simply
+      # stays at the previous file. Restore this, pointed at a distribution list, when
+      # someone depends on the Lorinlog data being current.
+
+      tasks:
+        - task_key: telemetry_synchro
+          notebook_task:
+            notebook_path: ../jobs/synchronise_telemetry.py
+            base_parameters:
+              # Blank = the newest export. Set it on a one-off run ("Run now with
+              # different parameters") to re-ingest a specific file by name.                  
+              sp_turbine_lens_id: ${var.run_as_sp}  
+          # Safe to retry: the run is a full read plus an overwrite, so a second attempt
+          # replaces whatever the first left behind rather than adding to it.
+          max_retries: 1
+          min_retry_interval_millis: 300000
+          # Measured ~75s end to end for 363 rows. The timeout is a circuit breaker for
+          # a hung volume read, not an expected duration.
+          timeout_seconds: 1800
+

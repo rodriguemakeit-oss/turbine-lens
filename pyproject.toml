@@ -1,0 +1,52 @@
+[tool.ruff]
+builtins = ["spark", "dbutils", "display"]
+exclude = [
+  "README.rst",
+  "README.md",
+  ".egg",
+  ".eggs",
+  ".git",
+  "__pycache__",
+  "build",
+  "dist",
+  "docs/",
+  "hooks/",
+  "old",
+  "venv",
+  "*.ipynb"
+]
+
+# Same as Black.
+line-length = 120
+indent-width = 4
+
+# Group violations by containing file.
+# output-format = "github"
+ 
+
+[tool.ruff.lint]
+# Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`) codes by default.
+# Unlike Flake8, Ruff doesn't enable pycodestyle warnings (`W`) or
+# McCabe complexity (`C901`) by default.
+select = ["E", "F", "B", "I", "R", "W"]
+ignore = ["E402", "RET504", "E501", "B905", "B904"]
+
+# Allow fix for all enabled rules (when `--fix`) is provided.
+fixable = ["ALL"]
+unfixable = []
+
+# Allow unused variables when underscore-prefixed.
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = []
+"**/{notebooks}/*" = ["F405", "F403"]
+"**/{tests}/*" = ["S101"]
+
+[tool.ruff.lint.mccabe]
+# Flag errors (`C901`) whenever the complexity level exceeds 5.
+max-complexity = 25
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+pythonpath = ["."]

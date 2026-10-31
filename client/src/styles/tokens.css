@@ -1,0 +1,226 @@
+:root {
+  --ui-btn-font-weight: 400;
+  --ui-core-color-grey-100: #edf3f6;
+  --ui-core-color-grey-200: #edf3f6;
+  --ui-core-color-grey-300: #edf3f6;
+  --ui-core-color-grey-400: #edf3f6;
+  --ui-core-color-grey-500: #edf3f6;
+  --ui-core-color-grey-600: #edf3f6;
+  --ui-core-color-grey-700: #edf3f6;
+  --ui-core-color-grey-800: #edf3f6;
+  --ui-core-color-grey-900: #edf3f6;
+  --ui-semantic-color-background-accent-blue-secondary-default: #087f72;
+  --ui-semantic-color-background-accent-blue-solid-default: #087f72;
+  --ui-semantic-color-background-accent-green-solid-default: #087f72;
+  --ui-semantic-color-background-accent-orange-solid-default: #087f72;
+  --ui-semantic-color-background-accent-purple-solid-default: #087f72;
+  --ui-semantic-color-background-accent-red-solid-default: #087f72;
+  --ui-semantic-color-background-accent-teal-solid-default: #087f72;
+  --ui-semantic-color-background-neutral-inverse-default: #13283a;
+  --ui-semantic-color-background-neutral-primary-default: #f7fafc;
+  --ui-semantic-color-background-neutral-secondary-default: #f7fafc;
+  --ui-semantic-color-background-status-danger-secondary-default: #d9485f;
+  --ui-semantic-color-background-status-danger-solid-default: #d9485f;
+  --ui-semantic-color-background-status-danger-tertiary-default: #d9485f;
+  --ui-semantic-color-background-status-discovery-solid-default: #8d62c9;
+  --ui-semantic-color-background-status-information-secondary-default: #f7fafc;
+  --ui-semantic-color-background-status-information-solid-default: #f7fafc;
+  --ui-semantic-color-background-status-information-tertiary-default: #f7fafc;
+  --ui-semantic-color-background-status-success-secondary-default: #1a9372;
+  --ui-semantic-color-background-status-success-solid-default: #1a9372;
+  --ui-semantic-color-background-status-success-tertiary-default: #1a9372;
+  --ui-semantic-color-background-status-warning-secondary-default: #dc8b16;
+  --ui-semantic-color-background-status-warning-solid-default: #dc8b16;
+  --ui-semantic-color-background-status-warning-tertiary-default: #dc8b16;
+  --ui-semantic-color-border-neutral-minimal-default: #cad8e0;
+  --ui-semantic-color-border-neutral-moderate-default: #cad8e0;
+  --ui-semantic-color-border-neutral-strong-default: #cad8e0;
+  --ui-semantic-color-border-neutral-subtle-default: #cad8e0;
+  --ui-semantic-color-border-status-danger-moderate-default: #d9485f;
+  --ui-semantic-color-border-status-danger-strong-default: #d9485f;
+  --ui-semantic-color-border-status-information-moderate-default: #cad8e0;
+  --ui-semantic-color-border-status-information-strong-default: #cad8e0;
+  --ui-semantic-color-border-status-success-moderate-default: #1a9372;
+  --ui-semantic-color-border-status-success-strong-default: #1a9372;
+  --ui-semantic-color-border-status-warning-moderate-default: #dc8b16;
+  --ui-semantic-color-border-status-warning-strong-default: #dc8b16;
+  --ui-semantic-color-text-neutral-contrast-default: #203849;
+  --ui-semantic-color-text-neutral-inverse-default: #13283a;
+  --ui-semantic-color-text-neutral-primary-default: #203849;
+  --ui-semantic-color-text-neutral-secondary-default: #203849;
+  --ui-semantic-color-text-neutral-tertiary-default: #203849;
+  --ui-semantic-color-text-status-danger-contrast-default: #d9485f;
+  --ui-semantic-color-text-status-information-contrast-default: #203849;
+  --ui-semantic-color-text-status-success-contrast-default: #1a9372;
+  --ui-semantic-color-text-status-warning-contrast-default: #dc8b16;
+  --ui-semantic-elevation-shadow-16-dp: 0 4px 18px #102a4310;
+  --ui-semantic-elevation-shadow-2-dp: 0 4px 18px #102a4310;
+  --ui-semantic-elevation-shadow-24-dp: 0 4px 18px #102a4310;
+  --ui-semantic-elevation-shadow-4-dp: 0 4px 18px #102a4310;
+  --ui-semantic-elevation-shadow-6-dp: 0 4px 18px #102a4310;
+  --ui-semantic-elevation-shadow-8-dp: 0 4px 18px #102a4310;
+  --ui-semantic-font-weight-bold: 700;
+  --ui-semantic-font-weight-regular: 400;
+  --ui-semantic-opacity-disabled: 8px;
+  --ui-semantic-size-border-focus-ring-offset: 8px;
+  --ui-semantic-size-border-focus-ring-width: 8px;
+  --ui-semantic-size-spacing-16: 8px;
+  --ui-sidebar-collapsed-width: 8px;
+}
+body[data-theme="dark"] {
+  --ui-btn-font-weight: 400;
+  --ui-core-color-grey-100: #172b3b;
+  --ui-core-color-grey-200: #172b3b;
+  --ui-core-color-grey-300: #172b3b;
+  --ui-core-color-grey-400: #172b3b;
+  --ui-core-color-grey-500: #172b3b;
+  --ui-core-color-grey-600: #172b3b;
+  --ui-core-color-grey-700: #172b3b;
+  --ui-core-color-grey-800: #172b3b;
+  --ui-core-color-grey-900: #172b3b;
+  --ui-semantic-color-background-accent-blue-secondary-default: #25c5ae;
+  --ui-semantic-color-background-accent-blue-solid-default: #25c5ae;
+  --ui-semantic-color-background-accent-green-solid-default: #25c5ae;
+  --ui-semantic-color-background-accent-orange-solid-default: #25c5ae;
+  --ui-semantic-color-background-accent-purple-solid-default: #25c5ae;
+  --ui-semantic-color-background-accent-red-solid-default: #25c5ae;
+  --ui-semantic-color-background-accent-teal-solid-default: #25c5ae;
+  --ui-semantic-color-background-neutral-inverse-default: #f7fafc;
+  --ui-semantic-color-background-neutral-primary-default: #112636;
+  --ui-semantic-color-background-neutral-secondary-default: #112636;
+  --ui-semantic-color-background-status-danger-secondary-default: #d9485f;
+  --ui-semantic-color-background-status-danger-solid-default: #d9485f;
+  --ui-semantic-color-background-status-danger-tertiary-default: #d9485f;
+  --ui-semantic-color-background-status-discovery-solid-default: #8d62c9;
+  --ui-semantic-color-background-status-information-secondary-default: #112636;
+  --ui-semantic-color-background-status-information-solid-default: #112636;
+  --ui-semantic-color-background-status-information-tertiary-default: #112636;
+  --ui-semantic-color-background-status-success-secondary-default: #1a9372;
+  --ui-semantic-color-background-status-success-solid-default: #1a9372;
+  --ui-semantic-color-background-status-success-tertiary-default: #1a9372;
+  --ui-semantic-color-background-status-warning-secondary-default: #dc8b16;
+  --ui-semantic-color-background-status-warning-solid-default: #dc8b16;
+  --ui-semantic-color-background-status-warning-tertiary-default: #dc8b16;
+  --ui-semantic-color-border-neutral-minimal-default: #355065;
+  --ui-semantic-color-border-neutral-moderate-default: #355065;
+  --ui-semantic-color-border-neutral-strong-default: #355065;
+  --ui-semantic-color-border-neutral-subtle-default: #355065;
+  --ui-semantic-color-border-status-danger-moderate-default: #d9485f;
+  --ui-semantic-color-border-status-danger-strong-default: #d9485f;
+  --ui-semantic-color-border-status-information-moderate-default: #355065;
+  --ui-semantic-color-border-status-information-strong-default: #355065;
+  --ui-semantic-color-border-status-success-moderate-default: #1a9372;
+  --ui-semantic-color-border-status-success-strong-default: #1a9372;
+  --ui-semantic-color-border-status-warning-moderate-default: #dc8b16;
+  --ui-semantic-color-border-status-warning-strong-default: #dc8b16;
+  --ui-semantic-color-text-neutral-contrast-default: #dce8ef;
+  --ui-semantic-color-text-neutral-inverse-default: #f7fafc;
+  --ui-semantic-color-text-neutral-primary-default: #dce8ef;
+  --ui-semantic-color-text-neutral-secondary-default: #dce8ef;
+  --ui-semantic-color-text-neutral-tertiary-default: #dce8ef;
+  --ui-semantic-color-text-status-danger-contrast-default: #d9485f;
+  --ui-semantic-color-text-status-information-contrast-default: #dce8ef;
+  --ui-semantic-color-text-status-success-contrast-default: #1a9372;
+  --ui-semantic-color-text-status-warning-contrast-default: #dc8b16;
+  --ui-semantic-elevation-shadow-16-dp: 0 4px 18px #102a4310;
+  --ui-semantic-elevation-shadow-2-dp: 0 4px 18px #102a4310;
+  --ui-semantic-elevation-shadow-24-dp: 0 4px 18px #102a4310;
+  --ui-semantic-elevation-shadow-4-dp: 0 4px 18px #102a4310;
+  --ui-semantic-elevation-shadow-6-dp: 0 4px 18px #102a4310;
+  --ui-semantic-elevation-shadow-8-dp: 0 4px 18px #102a4310;
+  --ui-semantic-font-weight-bold: 700;
+  --ui-semantic-font-weight-regular: 400;
+  --ui-semantic-opacity-disabled: 8px;
+  --ui-semantic-size-border-focus-ring-offset: 8px;
+  --ui-semantic-size-border-focus-ring-width: 8px;
+  --ui-semantic-size-spacing-16: 8px;
+  --ui-sidebar-collapsed-width: 8px;
+}
+@media (prefers-color-scheme: dark) { body[data-theme="system"], body:not([data-theme]) {
+  --ui-btn-font-weight: 400;
+  --ui-core-color-grey-100: #172b3b;
+  --ui-core-color-grey-200: #172b3b;
+  --ui-core-color-grey-300: #172b3b;
+  --ui-core-color-grey-400: #172b3b;
+  --ui-core-color-grey-500: #172b3b;
+  --ui-core-color-grey-600: #172b3b;
+  --ui-core-color-grey-700: #172b3b;
+  --ui-core-color-grey-800: #172b3b;
+  --ui-core-color-grey-900: #172b3b;
+  --ui-semantic-color-background-accent-blue-secondary-default: #25c5ae;
+  --ui-semantic-color-background-accent-blue-solid-default: #25c5ae;
+  --ui-semantic-color-background-accent-green-solid-default: #25c5ae;
+  --ui-semantic-color-background-accent-orange-solid-default: #25c5ae;
+  --ui-semantic-color-background-accent-purple-solid-default: #25c5ae;
+  --ui-semantic-color-background-accent-red-solid-default: #25c5ae;
+  --ui-semantic-color-background-accent-teal-solid-default: #25c5ae;
+  --ui-semantic-color-background-neutral-inverse-default: #f7fafc;
+  --ui-semantic-color-background-neutral-primary-default: #112636;
+  --ui-semantic-color-background-neutral-secondary-default: #112636;
+  --ui-semantic-color-background-status-danger-secondary-default: #d9485f;
+  --ui-semantic-color-background-status-danger-solid-default: #d9485f;
+  --ui-semantic-color-background-status-danger-tertiary-default: #d9485f;
+  --ui-semantic-color-background-status-discovery-solid-default: #8d62c9;
+  --ui-semantic-color-background-status-information-secondary-default: #112636;
+  --ui-semantic-color-background-status-information-solid-default: #112636;
+  --ui-semantic-color-background-status-information-tertiary-default: #112636;
+  --ui-semantic-color-background-status-success-secondary-default: #1a9372;
+  --ui-semantic-color-background-status-success-solid-default: #1a9372;
+  --ui-semantic-color-background-status-success-tertiary-default: #1a9372;
+  --ui-semantic-color-background-status-warning-secondary-default: #dc8b16;
+  --ui-semantic-color-background-status-warning-solid-default: #dc8b16;
+  --ui-semantic-color-background-status-warning-tertiary-default: #dc8b16;
+  --ui-semantic-color-border-neutral-minimal-default: #355065;
+  --ui-semantic-color-border-neutral-moderate-default: #355065;
+  --ui-semantic-color-border-neutral-strong-default: #355065;
+  --ui-semantic-color-border-neutral-subtle-default: #355065;
+  --ui-semantic-color-border-status-danger-moderate-default: #d9485f;
+  --ui-semantic-color-border-status-danger-strong-default: #d9485f;
+  --ui-semantic-color-border-status-information-moderate-default: #355065;
+  --ui-semantic-color-border-status-information-strong-default: #355065;
+  --ui-semantic-color-border-status-success-moderate-default: #1a9372;
+  --ui-semantic-color-border-status-success-strong-default: #1a9372;
+  --ui-semantic-color-border-status-warning-moderate-default: #dc8b16;
+  --ui-semantic-color-border-status-warning-strong-default: #dc8b16;
+  --ui-semantic-color-text-neutral-contrast-default: #dce8ef;
+  --ui-semantic-color-text-neutral-inverse-default: #f7fafc;
+  --ui-semantic-color-text-neutral-primary-default: #dce8ef;
+  --ui-semantic-color-text-neutral-secondary-default: #dce8ef;
+  --ui-semantic-color-text-neutral-tertiary-default: #dce8ef;
+  --ui-semantic-color-text-status-danger-contrast-default: #d9485f;
+  --ui-semantic-color-text-status-information-contrast-default: #dce8ef;
+  --ui-semantic-color-text-status-success-contrast-default: #1a9372;
+  --ui-semantic-color-text-status-warning-contrast-default: #dc8b16;
+  --ui-semantic-elevation-shadow-16-dp: 0 4px 18px #102a4310;
+  --ui-semantic-elevation-shadow-2-dp: 0 4px 18px #102a4310;
+  --ui-semantic-elevation-shadow-24-dp: 0 4px 18px #102a4310;
+  --ui-semantic-elevation-shadow-4-dp: 0 4px 18px #102a4310;
+  --ui-semantic-elevation-shadow-6-dp: 0 4px 18px #102a4310;
+  --ui-semantic-elevation-shadow-8-dp: 0 4px 18px #102a4310;
+  --ui-semantic-font-weight-bold: 700;
+  --ui-semantic-font-weight-regular: 400;
+  --ui-semantic-opacity-disabled: 8px;
+  --ui-semantic-size-border-focus-ring-offset: 8px;
+  --ui-semantic-size-border-focus-ring-width: 8px;
+  --ui-semantic-size-spacing-16: 8px;
+  --ui-sidebar-collapsed-width: 8px;
+}}
+
+.ui-button, .ui-segments button { display:inline-flex; align-items:center; justify-content:center; gap:.45rem; border-radius:10px; padding:.6rem .85rem; border:1px solid #87aaa7; cursor:pointer; font:inherit; }
+.ui-button { background:#087f72; color:white; }
+.ui-button[data-variant="destructive"] { background:#b8364b; }
+.ui-button[data-emphasis="minimal"] { background:transparent; color:inherit; border-color:transparent; }
+.ui-button:disabled { opacity:.45; cursor:not-allowed; }
+.ui-button:focus-visible, .ui-segments button:focus-visible { outline:3px solid #e6a744; outline-offset:3px; }
+.ui-button .material-icons, .ui-segments .material-icons { font-size:20px; }
+.ui-field { display:flex; flex-direction:column; gap:.35rem; font-size:.875rem; }
+.ui-field input:not([type="range"]), .ui-field textarea, .ui-search { width:100%; border:1px solid #a7bbc5; border-radius:10px; padding:.65rem .75rem; }
+.ui-checkbox { display:flex; align-items:flex-start; gap:.65rem; cursor:pointer; }
+.ui-checkbox input { accent-color:#087f72; margin-top:.3rem; }
+.ui-badge { display:inline-flex; align-items:center; border:1px solid currentColor; padding:.12rem .45rem; border-radius:30px; font-size:.7rem; }
+.ui-badge[data-variant="success"] { color:#1a9372; }
+.ui-badge[data-variant="danger"] { color:#d9485f; }
+.ui-badge[data-variant="warning"] { color:#b07516; }
+.ui-segments { display:inline-flex; gap:.25rem; padding:.2rem; border:1px solid #a7bbc5; border-radius:12px; }
+.ui-segments button { background:transparent; color:inherit; border:0; padding:.4rem .65rem; }
+.ui-segments button[aria-pressed="true"] { background:#087f72; color:white; }

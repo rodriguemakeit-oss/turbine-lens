@@ -1,0 +1,21 @@
+# Turbine Lens_MVP — Lakebase (managed Postgres) instance for session/message
+# persistence (R2). Smallest capacity (CU_1) is plenty for chat metadata.
+# Created with the deploying user's profile; the app SP is granted access
+# separately (see R2 notes). Public Preview resource — fields verified against
+# `databricks bundle schema`.
+resources:
+  database_instances:
+    turbine_lens_mvp_db:
+      name: ${var.db_instance_name}
+      capacity: "CU_1"
+      # This instance holds every session, message and mirrored chart spec, and
+      # changing `name` makes DABs DELETE and recreate it rather than rename it.
+      # `bundle plan` must never show `recreate` here.
+      # RESTORED 2026-09-16 after the -t1 -> real-name cutover. It was lifted for
+      # exactly one deploy, because the guard blocks what a rename must do: DABs
+      # deletes and recreates the instance rather than renaming it. Lift it only for
+      # a deliberate, reviewed recreate, and put it back in the same session.
+
+      lifecycle:
+        prevent_destroy: true
+  

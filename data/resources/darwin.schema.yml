@@ -1,0 +1,41 @@
+# The Lorinlog schema and its landing volume — the only UC containers this bundle owns.
+#
+# WHY ONLY THIS ONE. `rema_prod` and `rex_prod` are created at runtime by their
+# notebooks (`CREATE SCHEMA IF NOT EXISTS`), so the ingest SP holds CREATE SCHEMA and
+# owns what it creates. `lorinlogs` is different: its notebook does NOT create it, and
+# the volume beneath it has to exist before the job's file-arrival trigger has anything
+# to watch. Declaring it here is what makes a fresh environment one command rather than
+# one command plus a remembered click.
+#
+# CONSEQUENCE OF THAT SPLIT, deliberate: the DEPLOYER needs USE CATALOG + CREATE SCHEMA
+# on the catalog for this schema, and the INGEST SP needs the same for the two the
+# notebooks create. Both SPs hold it, which is broader than ideal — the price of not
+# putting all three schemas in the bundle.
+#
+# The deployer owns this schema, so the ingest SP is granted explicitly below. It is not
+# the owner here, unlike rema_prod and rex_prod where ownership carries the rights.
+resources:
+  schemas:
+    telemetry:
+      catalog_name: ${var.ingest_catalog}
+      name: telemetry
+      comment: "Telemetry table import and computed table. Managed by the ${bundle.name} bundle (target: ${bundle.target})."
+      # Removing this resource from the bundle would DROP the schema, the volume and the
+      # table on the next deploy.
+      lifecycle:
+        prevent_destroy: true
+      grants:
+        # The runner writes lorinlog_events and the Genie view into a schema it does not
+        # own, so these are required rather than inherited.
+        - principal: ${var.run_as_sp}
+          privileges:
+            - USE_SCHEMA
+            - CREATE_TABLE
+            - MODIFY
+            - SELECT
+        # The app's service principal reads the Genie view through the Lorinlog space.
+        - principal: portfolio-org0004-default-turbine_lens
+          privileges:
+            - USE_SCHEMA
+            - SELECT
+

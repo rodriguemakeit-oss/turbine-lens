@@ -1,0 +1,19 @@
+# Turbine Lens_MVP — MLflow experiment for GenAI tracing + assessments (R5 spike).
+# Created by the deploying user; the app SP is granted CAN_EDIT via the app
+# resource binding (see turbine_lens_mvp.app.yml) so it can log traces + feedback.
+resources:
+  experiments:
+    turbine_lens_mvp_traces:
+      name: ${var.experiment_path}
+      # Every per-answer feedback record and session assessment anchors to a
+      # trace in here, and they cannot be re-attached to a different experiment
+      # by hand. Renaming the path is an in-place update, but a `recreate` mints
+      # a new experiment id and orphans all of it — check `bundle plan` says
+      # `update` before applying any change to the name.
+      lifecycle:
+        prevent_destroy: true
+      trace_location:
+        uc_trace_location: 
+          catalog: ${var.databricks_catalog_name}
+          table_prefix: ${var.mlflow_table_prefix}
+          schema: ${resources.schemas.turbine_lens_traces_schema.name}

@@ -1,0 +1,22 @@
+# The landing volume for Lorinlog exports. Split from the schema file only because
+# `validate --strict` recommends one resource per .schema.yml; the two belong together
+# conceptually — the volume is what the job's file-arrival trigger watches, and without
+# it the trigger has nothing to fire on.
+resources:
+  volumes:
+    lorinlog_files_input:
+      catalog_name: ${var.ingest_catalog}
+      schema_name: ${resources.schemas.lorinlogs.name}
+      name: lorinlog_files_input
+      comment: "Drop .xlsx exports here; arrival triggers turbine_lens-lorinlog-ingest."
+      lifecycle:
+        prevent_destroy: true
+      grants:
+        # WRITE_VOLUME for whoever drops the export; the runner only needs to read it.
+        - principal: portfolio-org0004-default-turbine_lens
+          privileges:
+            - READ_VOLUME
+            - WRITE_VOLUME
+        - principal: ${var.run_as_sp}
+          privileges:
+            - READ_VOLUME

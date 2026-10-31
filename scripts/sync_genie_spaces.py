@@ -1,0 +1,119 @@
+"""Pull the Genie space definitions from the NOPROD authoring copies into this bundle.
+
+    python3 scripts/sync_genie_spaces.py <noprod-profile>
+    DATABRICKS_CONFIG_PROFILE=<noprod-profile> python3 scripts/sync_genie_spaces.py
+
+THE AUTHORING LOOP. Developers build and tune Genie spaces by hand in the noprod UI —
+that is prompt engineering, and an interactive UI is the right tool for it. This script
+captures the result so prod is deployed from a reviewed artifact rather than hand-edited:
+
+  1. change the space in the noprod UI until it answers well
+  2. python3 scripts/sync_genie_spaces.py <your noprod profile>
+  3. review the diff and commit    <- the only record of the prompt engineering
+  4. databricks bundle deploy -t prod --profile <prod deployer>
+
+WHY THE SPACES ARE DECLARED ON THE PROD TARGET ONLY. `mode: development` PREFIXES a
+Genie space title, so a dev deploy would either create six duplicates or — if bound —
+rename the six live noprod spaces to `[dev <identity>] ...`, flip-flopping them between
+developers. `include` is top-level only (verified against the bundle schema: a target
+cannot scope which resource files it loads) and a resource cannot be dropped for one
+target, so "prod only" means declaring inside `targets.prod.resources`.
+
+WHY THE DEFINITIONS NAME THE PROD CATALOG. Because the declaration is prod-only, the
+definition is only ever deployed to prod, so this script substitutes the prod catalog
+LITERALLY rather than using a `${var...}` reference. That is not a shortcut: a variable
+reference inside a .geniespace.json is NOT resolved by DABs — it fails the plan with
+`invalid dependency ... no such node` — so the alternative would be inlining ~74KB of
+JSON into databricks.yml. These files are the prod artifact; noprod remains the source.
+
+WHY NOT `databricks bundle generate genie-space`. It is the documented sync and would be
+preferable, but it resolves auth from the bundle's target. The spaces are declared on the
+prod target while the authoring copies live in noprod, so it refuses with a host
+mismatch. `genie get-space --include-serialized-space` returns the same definition plus
+the title and description in one call, with no host coupling.
+"""
+import json, os, pathlib, subprocess, sys
+
+# NO DEFAULT PROFILE, on purpose. This used to default to `default_dev`, which is one
+# developer's personal profile name. For anyone else that either fails with a confusing
+# "profile not found", or — worse — silently reads from whatever workspace THEIR
+# `default_dev` points at, and the sync would then overwrite every definition in
+# src/genie/ from the wrong environment. Each developer names their own profiles, so the
+# only safe default is none.
+PROFILE = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("DATABRICKS_CONFIG_PROFILE")
+if not PROFILE:
+    sys.exit(
+        "error: no profile given.\n"
+        "  usage: python3 scripts/sync_genie_spaces.py <noprod-profile>\n"
+        "  It must be YOUR profile for the NOPROD workspace (dbc-a1be2581-5271), where the\n"
+        "  authoring copies of the spaces live. `databricks auth profiles` lists yours.\n"
+        "  Pointing this at prod would overwrite src/genie/ from the deployed copies."
+    )
+NOPROD_CATALOG, PROD_CATALOG = "turbine_lens_dev", "turbine_lens_prod"
+# Group granted CAN_RUN on every prod space. The app's service principal is a member,
+# which is how the app reaches the spaces; see the permissions note in the emitted
+# fragment for why this is a group and not the SP itself.
+APP_READER_GROUP = "portfolio-org0004-default-turbine_lens"
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+SPACES_TSV = ROOT / "scripts" / "genie_spaces.tsv"
+DEFS = ROOT / "src" / "genie"
+
+
+def cli(*args):
+    return subprocess.run(["databricks", *args, "--profile", PROFILE],
+                          capture_output=True, text=True, check=True).stdout
+
+
+def main():
+    DEFS.mkdir(parents=True, exist_ok=True)
+    rows = [l.split("\t") for l in SPACES_TSV.read_text().splitlines() if l.strip()]
+    declared = []
+    for key, space_id, _label in rows:
+        meta = json.loads(cli("genie", "get-space", space_id,
+                              "--include-serialized-space", "-o", "json"))
+        definition = json.dumps(json.loads(meta["serialized_space"]), indent=1, ensure_ascii=False)
+        n = definition.count(NOPROD_CATALOG)
+        definition = definition.replace(NOPROD_CATALOG, PROD_CATALOG)
+        (DEFS / f"{key}.space.json").write_text(definition + "\n")
+        declared.append((key, meta["title"], (meta.get("description") or "").rstrip("\n")))
+        print(f"  {key:16} {len(definition):6} chars  catalog rewrites={n:2}  title={meta['title']!r}")
+
+    # The declarations themselves, emitted as a fragment to paste under
+    # targets.prod.resources — printed rather than written, so a human sees any new
+    # space arrive rather than having it appear silently in the config.
+    out = ROOT / "scripts" / "genie_spaces.prod.yml"
+    lines = ["# GENERATED by scripts/sync_genie_spaces.py — the prod declarations for the",
+             "# Genie spaces. Paste under `targets.prod.resources:` in databricks.yml when a",
+             "# space is ADDED or REMOVED; ordinary definition changes need only the .json",
+             "# files, which this script rewrites in place.",
+             "#",
+             "# The `permissions` block is emitted deliberately and MUST be pasted with the",
+             f"# rest. A space with no permissions is private to whoever created it, so the app's",
+             "# service principal gets `403 Forbidden` on every call — measured 2026-09-16, where",
+             "# six spaces deployed cleanly, the app booted, a plain question answered, and the",
+             "# entire Genie surface was dead. Nothing in validate, plan or deploy reports it.",
+             "#",
+             "# Granted to the GROUP, not to the app's SP: the app's config.env already depends",
+             "# on these space ids, so naming the app's SP here points a dependency back at the",
+             "# app — and an app SP is replaced on every app recreate, which would silently undo",
+             "# a direct grant. CAN_RUN, because asking a question executes SQL in the space;",
+             "# never CAN_EDIT, since nothing at runtime should change a space.",
+             "genie_spaces:"]
+    for key, title, desc in declared:
+        lines += [f"  {key}:",
+                  "    title: " + json.dumps(title),
+                  "    warehouse_id: ${var.warehouse_id}",
+                  "    parent_path: ${var.genie_parent_path}"]
+        if desc:
+            lines += ["    description: |-"] + ["      " + l for l in desc.splitlines()]
+        lines += [f"    file_path: src/genie/{key}.space.json",
+                  "    permissions:",
+                  f"      - level: CAN_RUN",
+                  f"        group_name: {APP_READER_GROUP}"]
+    out.write_text("\n".join(lines) + "\n")
+    print(f"\ndefinitions -> src/genie/   declarations -> {out.relative_to(ROOT)}")
+    print("Review the diff, then: databricks bundle deploy -t prod --profile <prod deployer>")
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,146 @@
+# Portfolio configuration. Supply your own workspace and resource IDs.
+bundle:
+  name: turbine_lens_mvp
+  engine: direct
+include:
+- resources/*.yml
+variables:
+  app_name:
+    description: 'Databricks App name. Lowercase letters, digits and hyphens only — no underscores — and
+      at most 26 characters. NOT dev-mode prefixed, so a shared workspace needs distinct values per deployment.
+      Left overridable rather than derived from `${workspace.current_user.short_name}`, because that resolves
+      to the local part of the email: fine for a short code like `demo-user`, illegal and over-length
+      for `firstname.lastname`.'
+    default: turbine_lens-mvp
+  db_instance_name:
+    description: Lakebase (managed Postgres) instance name. Also NOT dev-mode prefixed. Holds all conversation
+      state, so changing this value is destructive. Changing this value will destroy all conversation
+      state.
+    default: turbine_lens-mvp-db
+  db_database_name:
+    description: Postgres database inside the instance (platform default).
+    default: databricks_postgres
+  lakebase_schema:
+    description: Postgres schema the app creates its tables in. Safe to keep identical across environments
+      — each one has its own Postgres instance.
+    default: turbine_lens
+  databricks_catalog_name:
+    description: Unity Catalog catalog for the app to create its schema in. Safe to keep identical across
+      environments. Have also mlflow experiment in the same catalog.
+    default: ${var.ingest_catalog}
+  traces_schema_name:
+    description: OpenTelemetry schema for unity catalog where the app creates its tables in. Safe to keep
+      identical across environments. Have also mlflow experiment in the same schema.
+    default: turbine_lens_traces
+  mlflow_table_prefix:
+    description: Prefix for MLflow tables in Unity Catalog. Safe to keep identical across environments.
+    default: mlflow
+  otel_table_prefix:
+    description: Prefix for OpenTelemetry tables in Unity Catalog. Safe to keep identical across environments.
+    default: otel
+  turbine_lens_ia_schema_name:
+    description: Unity Catalog schema for inference tables. Safe to keep identical across environments.
+    default: turbine_lens_ia
+  inference_table_prefix:
+    description: Prefix for inference tables in Unity Catalog. Safe to keep identical across environments.
+    default: opus
+  app_compute_size:
+    description: MEDIUM or LARGE (MEDIUM is the floor; `validate --strict` rejects SMALL). Each turn spawns
+      a Claude CLI subprocess, so this is headroom under concurrency rather than padding.
+    default: LARGE
+  usage_policy_id:
+    description: Serverless usage policy — what stamps project=turbine_lens on the app's serverless usage
+      in system.billing.usage, and therefore the mechanism cost attribution depends on. Declared explicitly
+      so it cannot drift back to an inherited default that books this app to another project.
+    default: 00000000-0000-0000-0000-000000000000
+  experiment_path:
+    description: MLflow experiment for GenAI tracing, feedback and session assessments. Dev mode prefixes
+      experiment names, so each developer gets their own; a production-mode target takes the literal path.
+      Every per-answer feedback record and session assessment anchors to a trace in here.
+    default: /Users/${workspace.current_user.userName}/turbine_lens-experiment
+  warehouse_id:
+    description: 'SQL warehouse for the read-only `execute_sql` surface and for every Genie space. Genie
+      requires CAN USE on a Pro or Serverless warehouse.
+
+      In dev this is a LITERAL id, pointing at a warehouse created by hand. It cannot be a bundle resource
+      there: `mode: development` prefixes sql_warehouse names, presets are target-wide so one resource
+      cannot be exempted, and the prefix follows the deploying identity — so the shared dev warehouse''s
+      name would flip-flop between developers. Measured 2026-09-09 by binding it and reading the plan.
+
+      In prod it resolves to a bundle-managed warehouse declared on that target, so no id is ever written
+      down and DABs gets the dependency order right.'
+    default: 1000000000000000
+  warehouse_name:
+    description: Name of the bundle-managed SQL warehouse. Only used by targets that declare the warehouse
+      as a resource (prod); dev references an existing warehouse by id instead. Overridable so a rehearsal
+      deploy can use a throwaway name without consuming the real one.
+    default: turbine_lens_warehouse
+  genie_parent_path:
+    description: Workspace folder the Genie spaces are created in. IMMUTABLE on the resource — changing
+      it RECREATES the space, minting a new id and breaking the app that points at the old one. Only used
+      by targets that declare the spaces, which today means prod alone.
+    default: ''
+  genie_rema:
+    description: Genie space id for `rema`.
+    default: 0
+  genie_rex:
+    description: Genie space id for `rex`.
+    default: 0
+  genie_lorin:
+    description: Genie space id for `lorin`.
+    default: 0
+  genie_anomaly:
+    description: Genie space id for `anomaly`.
+    default: 0
+  genie_alarm_stop:
+    description: Genie space id for `alarm_stop`.
+    default: 0
+  genie_fleet_reporting:
+    description: Genie space id for `fleet_reporting`.
+    default: 0
+  deployer_sp:
+    description: Application ID (client_id) of the service principal that deploys a shared target. Feeds
+      run_as, the root_path and the bundle permissions from one place, so the identity that deploys and
+      the folder it writes into cannot drift apart. This is the APPLICATION id, not the SCIM numeric id
+      — confusing the two produces a PERMISSION_DENIED that names neither. Unused in dev, which humans
+      deploy as themselves.
+    default: ''
+  read_catalog:
+    description: 'Catalog holding four of the five allowlisted read-only tables. A Delta Sharing catalog,
+      so it is reachable only from workspaces it is bound to. The project-specific share (prd_telemetry_rfgbu_turbine_lens),
+      which keeps the pic / theoretical_active_power schema layout of the older shares — note only ONE
+      table is renamed inside it: cds_data.cds_10min_wind is cds.wind_10min here.'
+    default: turbine_lens_telemetry_data
+  loss_catalog:
+    description: 'Catalog holding the FIFTH allowlisted table, alphee.wind_stop_loss — the validated energy-loss
+      view that invariant #4 pins. Separate from read_catalog ONLY because the project share does not
+      carry it yet: a CDC copy is planned in the turbine_lens catalog, and the nearest table in the share
+      (stoplogbook.mismatch_wind_10min) is NOT a substitute — it holds the validation inputs and no loss
+      column at all, so pointing invariant #4 at it would silently change what "energy loss" means. Collapse
+      this back into read_catalog once the CDC table lands.'
+    default: ${var.ingest_catalog}
+  ingest_catalog:
+    description: 'Catalog the ingest bundle writes REMA, REX and Lorinlog data into. Read by the three
+      qualitative Genie spaces, never by execute_sql — those schemas are deliberately absent from ALLOWED_TABLES
+      (invariant #5).'
+    default: turbine_lens_dev
+  model:
+    description: 'Foundation-model endpoint for the agent loop. Pinned: Databricks FMAPI coding-agent-mode
+      support is model-specific and the CLI path fails on opus-4-8 even though a plain messages POST to
+      it returns 200. Do not vary per environment without re-testing the whole CLI round-trip.'
+    default: databricks-claude-opus-5-5
+  ALLOW_EDIT:
+    description: Allow edit/bash/grep in the app.
+    default: true
+targets:
+  dev:
+    mode: development
+    default: true
+    workspace:
+      host: https://workspace.example.invalid
+sync:
+  exclude:
+  - CLAUDE.md
+  - .vscode/
+  - data/
+  - docs/

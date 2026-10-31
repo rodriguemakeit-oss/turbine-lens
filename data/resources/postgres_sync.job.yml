@@ -1,0 +1,108 @@
+# Daily sync of the REMA and REX production PostgreSQL databases into Delta under
+# turbine_lens_dev (schemas rema_prod and rex_prod). These are the same two domains the app's
+# `rema_qualitative_context` and `rex_qualitative_context` Genie spaces already serve, so the
+# agent reaches this data through Genie, not through these tables: neither schema is in
+# ALLOWED_TABLES and adding them would touch invariant #5.
+#
+# Jobs and not pipelines: each notebook does a full read plus a MERGE per table with
+# delete-on-absent semantics — imperative and stateful, not a transformation graph.
+#
+# ONE job with TWO independent tasks rather than two jobs: they share a schedule, the
+# same internal-network dependency, the same credential pattern and the same target
+# catalog, so there is one place to look and one set of policy/run_as/permissions to keep
+# aligned. The tasks have no depends_on, so neither blocks the other; a failure in either
+# marks the run failed, which is what we want.
+resources:
+  jobs:
+    # The resource key stays `rema_sync` deliberately, even though the job now covers
+    # both sources: changing a resource key makes DABs DELETE and RECREATE the job (new
+    # job_id, run history gone), and the key is invisible outside this bundle. The
+    # display name below is what people see, and renaming that is an in-place update.
+    rema_sync:
+      name: "turbine_lens-postgres-sync"
+      description: >-
+        Daily full-refresh + MERGE of the REMA and REX production PostgreSQL databases
+        into turbine_lens_dev.rema_prod and turbine_lens_dev.rex_prod. Sources of the
+        qualitative initiatives/actions and lessons-learned data.
+
+      # Serverless usage attribution. Without this the job inherits whatever default
+      # applies and its DBUs are booked to another project — exactly the split that had
+      # the app on project=analyst while its own database was on project=turbine_lens.
+      # This is the policy that stamps project=turbine_lens.
+      #
+      # `budget_policy_id`, NOT the newer `usage_policy_id`, and deliberately so: the
+      # jobs API returns both (one is an alias of the other) and the bundle differ only
+      # converges on this one. Measured — declaring usage_policy_id, or both, leaves a
+      # permanent no-op `1 to change` on every plan with old == new, which would mask a
+      # real drift later. The app resource is the opposite case and correctly uses
+      # usage_policy_id, so do not "modernise" this to match it without re-checking that
+      # `bundle plan` still reports 0 to change immediately after a deploy.
+      budget_policy_id: ${var.usage_policy_id}
+
+      schedule:
+        # Quartz fields: sec min hour day-of-month month day-of-week.
+        # timezone_id is load-bearing — without it the run drifts an hour across DST.
+        quartz_cron_expression: "0 0 7 * * ?"
+        timezone_id: "Europe/Paris"
+        # Live. This was PAUSED from 2026-08-10, when serverless job compute could resolve
+        # example.invalid (172.18.64.61 / 172.18.42.86) but the TCP connect
+        # timed out — the AWS service credential and the Secrets Manager read both worked,
+        # so only the route was missing. The cloud team fixed it; unpaused 2026-08-12 after
+        # a supervised run of both tasks succeeded as the service principal (REMA 184s,
+        # REX 244s, and REX brought in 25 new records). Keep the habit: pause, verify with
+        # a manual run, then unpause — a broken schedule mails a failure every morning.
+        pause_status: ${var.schedules_paused}
+
+      # Two overlapping runs would MERGE the same 27 tables concurrently. The sync is
+      # idempotent within a run, not across concurrent ones.
+      max_concurrent_runs: 1
+
+      # NO email_notifications, deliberately — and know what that costs. The notebook's
+      # summary cannot distinguish "nothing changed" from "nothing synced" (its MERGE has
+      # no change predicate), so a run that silently syncs nothing looks exactly like a
+      # quiet night. Failure mail used to be the only signal; with none, a broken sync is
+      # found by someone noticing stale data. Restore it, pointed at a distribution list
+      # rather than an individual, the moment this data is relied on.
+
+      tasks:
+        - task_key: sync_rema_to_delta
+          notebook_task:
+            notebook_path: ../jobs/rema_postgres_to_delta_sync.ipynb
+            base_parameters:
+              # The notebooks used to hardcode `turbine_lens_dev`. Passed in so the
+              # same notebook writes to whichever catalog the target names.
+              target_catalog: ${var.ingest_catalog}
+              target_schema: rema_prod
+              service_credential: ${var.rema_credential}
+          environment_key: default
+          # Safe to retry: every run is a full read plus MERGE, so a second attempt
+          # converges rather than double-applying.
+          max_retries: 1
+          min_retry_interval_millis: 300000
+          # Measured 2026-08-12: 27 tables in ~159s. An hour is a circuit breaker for a
+          # hung connection, not an expected duration.
+          timeout_seconds: 3600
+
+        # No depends_on: REX runs alongside REMA rather than after it. They touch
+        # different schemas, so there is nothing to serialise, and a REMA failure should
+        # not prevent REX from syncing.
+        - task_key: sync_rex_to_delta
+          notebook_task:
+            notebook_path: ../jobs/rex_postgres_to_delta_sync.ipynb
+            base_parameters:
+              target_catalog: ${var.ingest_catalog}
+              target_schema: rex_prod
+              service_credential: ${var.rex_credential}
+          environment_key: default
+          max_retries: 1
+          min_retry_interval_millis: 300000
+          timeout_seconds: 3600
+
+      environments:
+        - environment_key: default
+          spec:
+            environment_version: "4"
+            # Pinned here so a scheduled run does not depend on the notebook's own
+            # `%pip install` reaching PyPI. Removing that cell finishes the job.
+            dependencies:
+              - psycopg2-binary==2.9.10

@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/turbine_lens_mark.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Turbine Lens</title>
+
+    <!-- Polices produit de la charte portfolio (Lato + Roboto Mono) : importées en
+         auto-hébergé depuis src/main.tsx, PAS depuis Google Fonts — fonts.gstatic.com
+         est bloqué depuis l'origine databricksapps.com (mesuré le 2026-09-01).
+
+         Les 4 familles Material Icons ne sont pas chargées : le code utilise
+         lucide-react, aucun composant NJ n'est encore employé. À rétablir en
+         auto-hébergé (paquet `material-icons`) le jour où on en pose un, sinon
+         chaque icône s'affichera en toutes lettres — CONTEXTE_MIGRATION_FLUID.md
+         §3, piège n°3. -->
+  </head>
+  <!-- data-theme="system" suit le réglage de l'OS ; "light" / "dark" le forcent.
+       La feuille de tokens embarque les deux thèmes : la rampe de gris s'inverse
+       toute seule, donc le mode sombre arrive sans toucher aux écrans. -->
+  <body data-theme="system" class="bg-gray-50">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

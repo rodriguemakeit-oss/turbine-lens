@@ -1,0 +1,40 @@
+# Schedules the ONE-DSQ pipeline.
+#
+# A separate job rather than a `trigger:` on the pipeline, for one reason: a pipeline
+# trigger cannot be paused, and this pipeline's first run is a full Auto Loader read of
+# ~775M rows from S3. A job carries `pause_status`, so a fresh environment deploys
+# paused and someone chooses when that run happens.
+#
+# It also puts all three ingest cadences in one vocabulary — this, the REMA/REX sync and
+# the Lorinlog file trigger are all job-level schedules now.
+resources:
+  jobs:
+    asset_api_refresh:
+      name: "turbine_lens-asset_api-refresh"
+      description: >-
+        Refreshes the ONE-DSQ fleet-KPI streaming tables and the two views the
+        fleet_reporting Genie space reads.
+
+      # Same policy as the other ingest jobs — `budget_policy_id`, not the newer
+      # `usage_policy_id`, because only the legacy name converges in a bundle differ.
+      budget_policy_id: ${var.usage_policy_id}
+
+      schedule:
+        # Every two days at 06:00 UTC, the cadence the hand-made tables used.
+        quartz_cron_expression: "0 0 6 */2 * ?"
+        timezone_id: "Europe/Paris"
+        pause_status: ${var.asset_api_paused}
+
+      # A full refresh reads the whole S3 prefix; two at once would duplicate that work
+      # and race on the same tables.
+      max_concurrent_runs: 1
+
+      # NO email_notifications, deliberately — matching the other ingest jobs. A failed
+      # refresh leaves the tables at the previous extract, which reads as "no new data"
+      # rather than as a failure. Restore it, pointed at a distribution list, before
+      # anyone treats these KPIs as current.
+
+      tasks:
+        - task_key: refresh_asset_api
+          pipeline_task:
+            pipeline_id: ${resources.pipelines.asset_api_ingest.id}

@@ -1,0 +1,66 @@
+# Portfolio configuration. Supply your own workspace and resource IDs.
+bundle:
+  name: turbine_lens_data
+  engine: direct
+include:
+- resources/*.yml
+variables:
+  ingest_catalog:
+    description: 'Catalog the ingest jobs write into. Read by three of the app''s Genie spaces, never
+      by execute_sql — those schemas are deliberately absent from ALLOWED_TABLES (invariant #5).'
+    default: turbine_lens_dev
+  asset_api_schema:
+    description: 'Schema for the ONE-DSQ fleet-KPI datasets. Now `asset_api` in every target — the cutover
+      is done. It briefly defaulted to `asset_api_next` so the pipeline-managed rebuild could publish
+      ALONGSIDE the hand-made DBSQL-managed tables and be diffed against them, which two sets of objects
+      cannot do under one name. That comparison passed: identical schemas, v_wind_kpis identical across
+      all 5,114,713 rows, and v_wind_assets differing only in five descriptive columns on 357 of 1,200
+      units — source drift between two extract dates, not a defect. Returning to `asset_api` is also what
+      leaves the fleet_reporting Genie space untouched: it still reads the name it always read.'
+    default: asset_api
+  rema_credential:
+    description: UC service credential granting the AWS Secrets Manager read that yields the REMA Postgres
+      password. Metastore-level and ISOLATED, so it must be bound to the workspace that uses it.
+    default: rema_prd_service_credential
+  rex_credential:
+    description: Same, for the REX management database.
+    default: rex_prd_service_credential
+  run_as_sp:
+    description: 'Application ID of the service principal the jobs run as. Deliberately not the deploying
+      identity: the run must not depend on who deployed, and it survives any change to an individual account.
+      Needs `roles/servicePrincipal.user` granted to the deployer, or setting run_as fails with a 403
+      from jobs/reset that names the role without explaining it.'
+    default: 00000000-0000-0000-0000-000000000000
+  usage_policy_id:
+    description: 'Serverless attribution. Declared as `budget_policy_id` on jobs and NOT the newer `usage_policy_id`:
+      the jobs API returns both as aliases and the bundle differ only converges on the legacy name, so
+      declaring the modern one leaves a permanent no-op `1 to change` on every plan with old == new —
+      which would mask real drift. The app resource is the opposite case.'
+    default: 00000000-0000-0000-0000-000000000000
+  schedules_paused:
+    description: 'PAUSED or UNPAUSED. Ships PAUSED for a new environment on purpose: the first run of
+      each job should be a supervised manual one, because a broken schedule mails a failure every morning
+      and the REMA/REX sync depends on a network route that has to be proven per workspace.'
+    default: PAUSED
+  asset_api_paused:
+    description: 'Pause switch for the ONE-DSQ refresh, SEPARATE from schedules_paused and defaulting
+      to PAUSED in EVERY target, so a new environment''s first run is a chosen one rather than a side
+      effect of deploying. Measured, and much cheaper than feared: a full refresh reads ONE extract —
+      16.8M rows in ~5.5 minutes — not the 775M the old table had accumulated across 47 extracts. The
+      source volume only ever holds the current extract, so the new table cannot and need not reproduce
+      that history.'
+    default: PAUSED
+  asset_api_source_root:
+    description: 'Where Auto Loader reads the ONE-DSQ parquet extracts. A UNITY CATALOG VOLUME path, not
+      the raw `s3://` bucket the hand-made tables used. The volume is the interface DIT actually registered
+      for this data, and it is better in three ways: the privilege chain is ordinary UC (USE CATALOG +
+      USE SCHEMA + READ VOLUME) instead of external-location and storage-credential coupling; the name
+      is stable if the bucket ever moves; and it stops the `aitpreprod` bucket name being baked into the
+      pipeline. NOTE the data is still preproduction — accepted, and the same source feeds both environments.'
+    default: /Volumes/ait_preprod_3_gold/writeback/writeback_volume
+targets:
+  dev:
+    mode: development
+    default: true
+    workspace:
+      host: https://workspace.example.invalid

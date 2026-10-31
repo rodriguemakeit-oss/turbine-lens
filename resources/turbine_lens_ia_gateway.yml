@@ -1,0 +1,34 @@
+resources:
+  schemas:
+    turbine_lens_traces_schema:
+      name: ${var.traces_schema_name}
+      comment: 'Turbine Lens MVP Unity Catalog schema for model service and inference tables'
+      catalog_name: ${var.databricks_catalog_name}
+      grants:
+        - principal: portfolio-org0004-default-turbine_lens
+          privileges: [SELECT, USAGE, CREATE, MODIFY]
+
+    turbine_lens_ia_schema:
+      name: ${var.turbine_lens_ia_schema_name}
+      comment: 'Turbine Lens MVP Unity Catalog schema for model service and inference tables'
+      catalog_name: ${var.databricks_catalog_name}
+
+  model_services:
+    turbine_lens_ia_gateway:
+      parent: schemas/${var.databricks_catalog_name}.${resources.schemas.turbine_lens_ia_schema.name}
+      model_service_id: FleetmindOpus
+      comment: 'Fleetmind Opus model service'      
+      config:
+        routing:
+          destinations:
+            - name: primary
+              destination_type: DESTINATION_TYPE_PAY_PER_TOKEN_FOUNDATION_MODEL
+              pay_per_token_config:
+                model: models/system.ai.${var.model}
+              traffic_percentage: 100
+        inference_table: 
+            parent: schemas/${var.databricks_catalog_name}.${resources.schemas.turbine_lens_ia_schema.name}
+      grants:
+        - principal: portfolio-org0004-default-turbine_lens
+          privileges: [EXECUTE]
+            

@@ -1,0 +1,107 @@
+# Ingest of the Lorinlog Excel exports that land in
+# /Volumes/turbine_lens_dev/lorinlogs/lorinlog_files_input/ into
+# turbine_lens_dev.lorinlogs.lorinlog_events. See data/jobs/lorinlog_excel_to_delta.ipynb
+# for what the notebook is careful about (text day-first dates, a hand-maintained
+# numeric column, choosing the newest file by parsed timestamp rather than by name).
+#
+# A SEPARATE job rather than a third task on `turbine_lens-postgres-sync`, by that job's
+# own stated test: those two tasks are one job because they share a schedule, an
+# internal-network dependency, a credential pattern and a target catalog. This shares
+# only the catalog. It reads a Unity Catalog volume — no network route, no AWS service
+# credential, no Secrets Manager — needs a different Python dependency, and follows the
+# cadence of whoever drops the export rather than the databases' nightly window. Being
+# separate also keeps the failure domains apart: in that job a failure in either task
+# marks the run failed, which is right for two halves of one sync and wrong here, where
+# an unreadable spreadsheet should not report the Postgres sync as broken.
+resources:
+  jobs:
+    lorinlog_ingest:
+      name: "turbine_lens-lorinlog-ingest"
+      description: >-
+        Loads the newest Lorinlog .xlsx export from
+        /Volumes/<ingest catalog>/lorinlogs/lorinlog_files_input/ into
+        <ingest catalog>.lorinlogs.lorinlog_events, replacing the table each run.
+
+      # Stamps project=turbine_lens on this job's serverless DBUs. `budget_policy_id` and
+      # NOT `usage_policy_id`, matching postgres_sync.job.yml for the reason measured
+      # there: the jobs API returns both as aliases and the bundle differ only converges
+      # on this one, so declaring the newer name leaves a permanent no-op `1 to change`
+      # on every plan — which would mask a real drift later.
+      budget_policy_id: ${var.usage_policy_id}
+
+      # Event-based, not time-based: the run follows the upload. There is no cron here
+      # on purpose — the export cadence is whoever drops the file, so a clock schedule
+      # would either lag the export or reload the previous one.
+      trigger:
+        # Follows the same switch as the cron schedules, even though this is an event
+        # trigger. It was hardcoded UNPAUSED, which is right for noprod and wrong for a
+        # new environment: the trigger would fire the first time anyone dropped a file,
+        # unattended, before the runner's catalog grants had been proven — and with no
+        # failure notification that would fail silently, leaving a table that simply
+        # never appeared.
+        pause_status: ${var.schedules_paused}
+        file_arrival:
+          # A Unity Catalog volume path is a supported trigger URL. The trailing slash
+          # keeps it unambiguous that this is the directory being watched.
+          url: "/Volumes/${var.ingest_catalog}/lorinlogs/lorinlog_files_input/"
+          # THE important one. An .xlsx being uploaded is visible as a growing file, and
+          # firing the moment it appears would hand openpyxl a truncated zip — a
+          # workbook is a zip archive whose central directory is written last, so a
+          # partial upload does not read as "fewer rows", it fails to open at all (or,
+          # worse for a different format, parses as garbage). This waits for the file to
+          # stop changing before the run starts.
+          wait_after_last_change_seconds: 60
+          # Several exports dropped together should produce one run, not one per file.
+          # Harmless given the notebook ingests the newest file, but a burst of runs
+          # each overwriting the same table is noise nobody needs to read.
+          min_time_between_triggers_seconds: 60
+
+      # The notebook overwrites the whole table, so two overlapping runs would race to
+      # replace it. Serialise them — and see `queue` below, which is what stops that
+      # serialisation from silently dropping an export.
+      max_concurrent_runs: 1
+
+      # Load-bearing with an event trigger. Without a queue, a trigger that fires while
+      # a run is active is DISCARDED — so a file landing during the previous file's run
+      # would never be ingested, and nothing would report it: no failure, no mail, just
+      # a table quietly one export behind until the next upload happened to arrive.
+      # Queued instead, the second run starts when the first finishes and picks up the
+      # newest file.
+      queue:
+        enabled: true
+
+      # NO email_notifications, deliberately. The notebook is loud by design — a date
+      # that does not parse, or a header that no longer matches the export, raises rather
+      # than loading a wrong table — but with no notification that noise goes nowhere.
+      # An export whose shape changed upstream now fails silently and the table simply
+      # stays at the previous file. Restore this, pointed at a distribution list, when
+      # someone depends on the Lorinlog data being current.
+
+      tasks:
+        - task_key: ingest_lorinlog_excel
+          notebook_task:
+            notebook_path: ../jobs/lorinlog_excel_to_delta.ipynb
+            base_parameters:
+              # Blank = the newest export. Set it on a one-off run ("Run now with
+              # different parameters") to re-ingest a specific file by name.
+              source_file: ""
+              target_catalog: ${var.ingest_catalog}
+              target_schema: lorinlogs
+          environment_key: default
+          # Safe to retry: the run is a full read plus an overwrite, so a second attempt
+          # replaces whatever the first left behind rather than adding to it.
+          max_retries: 1
+          min_retry_interval_millis: 300000
+          # Measured ~75s end to end for 363 rows. The timeout is a circuit breaker for
+          # a hung volume read, not an expected duration.
+          timeout_seconds: 1800
+
+      environments:
+        - environment_key: default
+          spec:
+            environment_version: "4"
+            # Pinned so a scheduled run does not depend on the notebook's own
+            # `%pip install openpyxl` reaching PyPI. The notebook keeps that cell for
+            # interactive use, where there is no environment spec to rely on.
+            dependencies:
+              - openpyxl==3.1.5

@@ -1,0 +1,75 @@
+# ONE-DSQ fleet-KPI ingest — the data behind the `fleet_reporting` Genie space.
+#
+# WHY THIS IS A PIPELINE AND NOT A JOB, unlike everything else in this bundle: the two
+# datasets are Auto Loader streaming tables over parquet in S3. The other jobs read
+# Postgres and a spreadsheet; this one is incremental file ingestion, which is what a
+# declarative pipeline is for.
+#
+# THIS REPLACES TWO HAND-MADE TABLES, and it cannot adopt them. The existing
+# `asset_api.master_data` and `asset_api.onm_kpis_loadback_all` were created through the
+# DBSQL file-upload UI, which builds a streaming table backed by a hidden pipeline whose
+# definition lives in the TABLE, not the pipeline — `spec.libraries` is empty. Binding
+# such a pipeline into a bundle succeeds and even plans cleanly as `1 to change, 0 to
+# delete`, then the deploy fails: `Pipeline type 'DBSQL' is not supported` (measured
+# 2026-09-10). A clean plan is not proof that a deploy will work.
+#
+# So this pipeline builds its OWN copies, published to ${var.asset_api_schema} — which
+# defaults to `asset_api_next` precisely so the new objects can sit alongside the old ones
+# and be compared against them before anything is cut over. The comparison that matters
+# is on the VIEWS, since those are what Genie reads; see docs and the checks in the PR.
+#
+# Scheduling is NOT in the table DDL. The DBSQL `SCHEDULE CRON` clause has no meaning in
+# a pipeline, so it was stripped from the SQL and re-expressed as the trigger below —
+# which also makes the cadence visible in the bundle instead of buried in a column list.
+resources:
+  pipelines:
+    asset_api_ingest:
+      name: turbine_lens-asset_api-ingest
+      catalog: ${var.ingest_catalog}
+      schema: ${var.asset_api_schema}
+      serverless: true
+      photon: true
+      # `development: false` even in the shared/noprod target: this is the canonical
+      # ingest, not a sandbox, and development mode would retain compute between runs.
+      development: false
+      continuous: false
+
+      # NO `trigger:` here on purpose. A pipeline trigger has no pause switch, and
+      # `mode: production` would leave it active — so a bare deploy would kick off an
+      # unattended full ingest (~775M rows) within two days. Scheduling lives in
+      # asset_api.job.yml instead, whose `pause_status` follows ${var.schedules_paused}
+      # like every other schedule in this bundle, so a new environment starts paused
+      # and its first run is a supervised one.
+
+      # Copied verbatim from the DBSQL-created pipelines. Two of these affect ingest and
+      # are not defaults: `timeParserPolicy` governs date parsing, and the Auto Loader
+      # admission control governs how much each run picks up. The thriftServer entries
+      # are DBSQL-gateway leftovers and harmless, kept only so the configuration is
+      # provably the same as the tables this replaces.
+      configuration:
+        # Read by the SQL as ${asset_api.source_root}. The path lives here rather than in
+        # the .sql files because a pipeline library is synced VERBATIM — DABs does not
+        # template files it uploads (the same reason app.yml could not hold variables),
+        # so pipeline configuration is the only way to make it per-target.
+        asset_api.source_root: ${var.asset_api_source_root}
+        pipelines.enzyme.enabled: "true"
+        pipelines.enzyme.mode: "Advanced"
+        spark.databricks.streaming.dynamicAdmissionControl.cloudFiles.enabled: "true"
+        spark.sql.legacy.timeParserPolicy: "CORRECTED"
+        spark.sql.session.collation.default: "UTF8_BINARY"
+        spark.sql.session.timeZone: "Etc/UTC"
+        spark.sql.ansi.enabled: "true"
+        spark.sql.ansi.enforceAnsiTypeCoercion: "true"
+        spark.sql.ansi.enforceReservedKeywords: "false"
+
+      libraries:
+        # Order is irrelevant — the pipeline resolves the dependency graph itself — but
+        # the tables are listed first because the views read them.
+        - file:
+            path: ../src/asset_api/master_data.sql
+        - file:
+            path: ../src/asset_api/onm_kpis_loadback_all.sql
+        - file:
+            path: ../src/asset_api/v_wind_assets.sql
+        - file:
+            path: ../src/asset_api/v_wind_kpis.sql

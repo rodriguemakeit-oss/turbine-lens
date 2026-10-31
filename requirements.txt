@@ -1,0 +1,32 @@
+# Agent loop — bundles the Claude Code CLI; proven on Databricks Apps.
+claude-agent-sdk>=0.2.110
+anthropic
+
+# Databricks SDK — mints the FMAPI token from the app's service principal.
+databricks-sdk>=0.36.0
+
+# Deps of the vendored databricks_tools_core.sql (read-only tools).
+sqlglot
+sqlfluff
+pyyaml
+
+# Persistence (R2) — Lakebase/Postgres. psycopg3 is NOT preinstalled on Apps;
+# omitting it is the most common Lakebase-app startup crash.
+SQLAlchemy>=2.0
+psycopg[binary]>=3.1
+
+# Observability (R5 spike) — MLflow 3 GenAI tracing + assessments/feedback.
+mlflow>=3.5
+
+# Charts — Plotly used server-side for chart JSON validation.
+plotly>=5.0
+
+# Web framework — FastAPI + Uvicorn (Gradio removed).
+fastapi
+uvicorn[standard]
+
+
+# Opentelemetry for mlflow & Claude tracing. See server/otel_tracing.py & server/tracing.py for the information.
+opentelemetry-sdk
+opentelemetry-exporter-otlp
+
