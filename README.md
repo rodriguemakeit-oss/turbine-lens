@@ -1,27 +1,24 @@
 # Turbine Lens
 
-Assistant analytique pour explorer une flotte énergétique avec FastAPI, React, Genie et des outils SQL en lecture seule.
+A web application prototype for exploring energy-fleet data through a natural-language analytics interface.
 
-Version de portfolio maintenue sur [rodriguemakeit-oss](https://github.com/rodriguemakeit-oss).
+## What it demonstrates
 
-## Ce que le projet explore
+- A React client with a light and dark theme
+- A FastAPI service
+- Read-only SQL tool patterns for analytics
+- Integration points for Databricks Genie and model services
 
-Assistant analytique pour explorer une flotte énergétique avec FastAPI, React, Genie et des outils SQL en lecture seule. L’accent est mis sur la séparation des composants, la configuration explicite et la réutilisation des traitements.
+## Repository map
 
-## Structure
+- `client/` — web interface
+- `server/` — API and service configuration
+- `data/` and `resources/` — sample and deployment resources
 
-`server/ · client/ · data/ · resources/`
+## Run locally
 
-## Prise en main
+See [GUIDE.md](GUIDE.md). The full application requires your own Databricks, Genie, model, and database services. No production conversation exports or business data are included.
 
-Consultez [GUIDE.md](GUIDE.md) pour les commandes et la configuration détaillées.
+## Scope
 
-Les valeurs de déploiement sont des exemples. Les identifiants nuls et les domaines `example.invalid` doivent être remplacés dans votre propre environnement. Aucun déploiement cloud n’est lancé automatiquement.
-
-## État du projet
-
-Cette adaptation nécessite vos propres services et jeux de données. Les contrôles locaux sont décrits dans [VALIDATION.md](VALIDATION.md) ; ils ne constituent pas une validation des intégrations cloud.
-
-## Contributions et licences
-
-Les noms de packages, crédits d’auteurs et avis tiers conservés dans les sources s’appliquent à leurs composants respectifs. Aucune licence globale supplémentaire n’est attribuée à ce dépôt.
+This is a prototype, not a production analytics service. Configure read-only permissions and review SQL controls before connecting a data source. See [VALIDATION.md](VALIDATION.md).
